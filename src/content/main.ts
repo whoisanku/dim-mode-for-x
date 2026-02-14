@@ -14,10 +14,11 @@ let prefs: XDimModePrefs = DEFAULT_X_DIM_MODE_PREFS
 
 function syncRuntime() {
   ensureXDimModeStyle()
-  setXDimModeRootActive(prefs.enabled)
+  const shouldApplyDim = prefs.enabled && isLightsOutThemeActive()
+  setXDimModeRootActive(shouldApplyDim)
 
   // Only scan/patch when X is in "Lights out" mode, otherwise we do nothing.
-  if (!prefs.enabled || !isLightsOutThemeActive()) {
+  if (!shouldApplyDim) {
     scanner.clearAllMarks()
   }
   else {

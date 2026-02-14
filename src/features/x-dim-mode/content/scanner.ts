@@ -2,10 +2,11 @@ import {
   X_DIM_MODE_DIMMED_CLASS,
   X_DIM_MODE_DIMMED_ELEVATED_CLASS,
 } from './constants'
+import { X_LIGHTS_OUT_ELEVATED_BG } from '../model/colors'
 
 const COLOR_BLACK = new Set(['rgb(0,0,0)', 'rgb(0,0,0,1)', 'rgba(0,0,0,1)', '#000', '#000000'])
 const COLOR_BACKDROP = new Set(['rgba(0,0,0,0.65)', 'rgb(0,0,0,0.65)', 'rgba(0 0 0 / 0.65)'])
-const COLOR_ELEVATED = new Set(['rgb(24,24,27)'])
+const COLOR_ELEVATED = new Set([normalizeColor(X_LIGHTS_OUT_ELEVATED_BG)])
 
 function normalizeColor(value: string): string {
   return value.trim().toLowerCase().replace(/ /g, '')
