@@ -1,20 +1,21 @@
-const DIM_RGB = '21, 32, 43'
-const DIM_BG = `rgb(${DIM_RGB})`
-const DIM_BG_HOVER = 'rgb(30, 41, 54)'
-const DIM_ELEVATED = 'rgb(24, 24, 27)'
-const DIM_BACKDROP = 'rgba(0, 0, 0, 0.65)'
-const DIM_TEXT = 'rgb(231, 233, 234)'
-const DIM_BORDER = 'rgba(255, 255, 255, 0.2)'
+import {
+  X_DIM_BACKDROP,
+  X_DIM_BG,
+  X_DIM_BG_HOVER,
+  X_DIM_BORDER,
+  X_DIM_ELEVATED,
+  X_DIM_TEXT,
+} from './colors'
 
 export function getXDimModeCss(rootClass: string): string {
   return `
 html.${rootClass} {
-  --xdm-bg: ${DIM_BG};
-  --xdm-bg-hover: ${DIM_BG_HOVER};
-  --xdm-bg-elevated: ${DIM_ELEVATED};
-  --xdm-backdrop: ${DIM_BACKDROP};
-  --xdm-text: ${DIM_TEXT};
-  --xdm-border: ${DIM_BORDER};
+  --xdm-bg: ${X_DIM_BG};
+  --xdm-bg-hover: ${X_DIM_BG_HOVER};
+  --xdm-bg-elevated: ${X_DIM_ELEVATED};
+  --xdm-backdrop: ${X_DIM_BACKDROP};
+  --xdm-text: ${X_DIM_TEXT};
+  --xdm-border: ${X_DIM_BORDER};
 }
 
 /*

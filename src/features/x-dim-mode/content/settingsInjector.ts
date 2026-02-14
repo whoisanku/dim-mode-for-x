@@ -1,10 +1,7 @@
 import { setXDimModePrefs } from '../model/storage'
 import type { XDimModePrefs } from '../model/prefs'
+import { X_ACCENT, X_DIM_BG, X_DIM_TEXT } from '../model/colors'
 import { X_DIM_MODE_BUTTON_ID } from './constants'
-
-const DIM_BG = 'rgb(21, 32, 43)'
-const ACCENT = 'rgb(29, 155, 240)'
-const TEXT = 'rgb(231, 233, 234)'
 
 const CHECKMARK_SVG = `
 <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
@@ -13,21 +10,21 @@ const CHECKMARK_SVG = `
 `.trim()
 
 function setSelected(button: HTMLElement) {
-  button.style.backgroundColor = DIM_BG
-  button.style.border = `2px solid ${ACCENT}`
-  button.style.outline = `2px solid ${ACCENT}`
+  button.style.backgroundColor = X_DIM_BG
+  button.style.border = `2px solid ${X_ACCENT}`
+  button.style.outline = `2px solid ${X_ACCENT}`
 
   const inner = button.querySelector<HTMLElement>('div[dir="ltr"]')
-  if (inner) inner.style.color = TEXT
+  if (inner) inner.style.color = X_DIM_TEXT
 }
 
 function setUnselected(button: HTMLElement) {
-  button.style.backgroundColor = DIM_BG
+  button.style.backgroundColor = X_DIM_BG
   button.style.border = '2px solid transparent'
   button.style.outline = 'none'
 
   const inner = button.querySelector<HTMLElement>('div[dir="ltr"]')
-  if (inner) inner.style.color = ACCENT
+  if (inner) inner.style.color = X_ACCENT
 }
 
 function setLabel(button: HTMLElement, selected: boolean) {
