@@ -47,6 +47,11 @@ const bodyObserver = new MutationObserver(() => {
 })
 
 const rootObserver = new MutationObserver((mutations) => {
+  // X is a SPA; settings UI is mounted/unmounted without full page loads.
+  // Keep trying to inject the Dim option as the Display settings DOM appears.
+  tryInjectDimModeIntoXSettings(prefs)
+  syncInjectedDimButton(prefs)
+
   if (!prefs.enabled || !isLightsOutThemeActive()) return
 
   for (const m of mutations) {
@@ -108,4 +113,3 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
 
   return true
 })
-

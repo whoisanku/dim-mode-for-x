@@ -1,70 +1,123 @@
-import { setXDimModePrefs } from '../model/storage'
 import type { XDimModePrefs } from '../model/prefs'
-import { X_ACCENT, X_DIM_BG, X_DIM_TEXT } from '../model/colors'
+import { setXDimModePrefs } from '../model/storage'
+import { X_ACCENT, X_DIM_BG } from '../model/colors'
 import { X_DIM_MODE_BUTTON_ID } from './constants'
 
+const DIM_LABEL = 'Dim'
+
+// Copied from X's own checkmark glyph (minimal).
 const CHECKMARK_SVG = `
-<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-  <path fill="currentColor" d="M9.000 16.200 5.500 12.700 4.100 14.100 9.000 19.000 20.300 7.700 18.900 6.300z"></path>
+<svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18">
+  <path fill="currentColor" d="M9.64 18.952l-5.55-4.861 1.317-1.504 3.951 3.459 8.459-10.948L19.4 6.32 9.64 18.952z"></path>
 </svg>
 `.trim()
 
-function setSelected(button: HTMLElement) {
-  button.style.backgroundColor = X_DIM_BG
-  button.style.border = `2px solid ${X_ACCENT}`
-  button.style.outline = `2px solid ${X_ACCENT}`
+// These come from X's own Lights Out styling and keep the injected button consistent.
+const UNSELECTED_BORDER = 'rgb(51, 54, 57)'
+const UNSELECTED_CIRCLE_BORDER = 'rgb(185, 202, 211)'
 
-  const inner = button.querySelector<HTMLElement>('div[dir="ltr"]')
-  if (inner) inner.style.color = X_DIM_TEXT
+let switchingToDim = false
+
+function getRadioCircle(btnEl: HTMLElement): HTMLElement | null {
+  return btnEl.querySelector<HTMLElement>('[role="radio"] > div')
 }
 
-function setUnselected(button: HTMLElement) {
-  button.style.backgroundColor = X_DIM_BG
-  button.style.border = '2px solid transparent'
-  button.style.outline = 'none'
+function setSelected(btnEl: HTMLElement) {
+  btnEl.style.borderColor = X_ACCENT
+  btnEl.style.borderWidth = '2px'
 
-  const inner = button.querySelector<HTMLElement>('div[dir="ltr"]')
-  if (inner) inner.style.color = X_ACCENT
+  const circle = getRadioCircle(btnEl)
+  if (circle) {
+    circle.style.backgroundColor = X_ACCENT
+    circle.style.borderColor = X_ACCENT
+    circle.style.color = 'white'
+    circle.innerHTML = CHECKMARK_SVG
+  }
+
+  const input = btnEl.querySelector<HTMLInputElement>('input[type="radio"]')
+  if (input) input.checked = true
 }
 
-function setLabel(button: HTMLElement, selected: boolean) {
-  const inner = button.querySelector<HTMLElement>('div[dir="ltr"]')
-  if (!inner) return
-  inner.innerHTML = selected
-    ? `${CHECKMARK_SVG}<div dir="ltr">Dim</div>`
-    : `<div dir="ltr">Dim</div>`
+function setUnselected(btnEl: HTMLElement) {
+  btnEl.style.borderColor = UNSELECTED_BORDER
+  btnEl.style.borderWidth = '1px'
+
+  const circle = getRadioCircle(btnEl)
+  if (circle) {
+    circle.style.backgroundColor = 'rgba(0, 0, 0, 0)'
+    circle.style.borderColor = UNSELECTED_CIRCLE_BORDER
+    circle.innerHTML = ''
+  }
+
+  const input = btnEl.querySelector<HTMLInputElement>('input[type="radio"]')
+  if (input) input.checked = false
 }
 
-function getBackgroundPickerGroup(): HTMLElement | null {
-  const anyInput = document.querySelector<HTMLInputElement>('input[name="background-picker"]')
-  if (!anyInput) return null
-  return anyInput.closest<HTMLElement>('[role="radiogroup"]')
+function getBackgroundPickerRadioGroup(): HTMLElement | null {
+  const anyRadio = document.querySelector<HTMLInputElement>('input[name="background-picker"]')
+  if (!anyRadio) return null
+  return anyRadio.closest<HTMLElement>('[role="radiogroup"]')
 }
 
-function getButtonForValue(group: HTMLElement, value: string): HTMLElement | null {
-  const input = group.querySelector<HTMLInputElement>(`input[value="${value}"]`)
-  if (!input) return null
-  return input.closest<HTMLElement>('label')
+function getBackgroundButtons(radiogroup: HTMLElement): HTMLElement[] {
+  const buttons = Array.from(radiogroup.querySelectorAll<HTMLElement>(':scope > div'))
+  if (buttons.length >= 2) return buttons
+
+  // Fallback for markup variants: find elements that contain the background-picker radios.
+  const radios = Array.from(radiogroup.querySelectorAll<HTMLInputElement>('input[name="background-picker"][type="radio"]'))
+  const unique = new Set<HTMLElement>()
+  for (const radio of radios) {
+    const btn = radio.closest<HTMLElement>('div')
+    if (btn) unique.add(btn)
+  }
+  return Array.from(unique)
 }
 
-function activateLightsOut(group: HTMLElement) {
-  const lightsOutButton = getButtonForValue(group, 'LightsOut')
-  const lightsOutInput = lightsOutButton?.querySelector<HTMLInputElement>('input')
-  if (!lightsOutButton || !lightsOutInput) return
-  if (lightsOutInput.checked) return
+function syncSettingsButtons(enabled: boolean) {
+  const dimBtn = document.getElementById(X_DIM_MODE_BUTTON_ID)
+  if (!(dimBtn instanceof HTMLElement)) return
+  const radiogroup = dimBtn.closest<HTMLElement>('[role="radiogroup"]')
+  if (!radiogroup) return
 
-  lightsOutButton.click()
-  lightsOutInput.dispatchEvent(new Event('input', { bubbles: true }))
-  lightsOutInput.dispatchEvent(new Event('change', { bubbles: true }))
+  const allBtns = getBackgroundButtons(radiogroup)
+  const lightsOutBtn = allBtns[allBtns.length - 1]
+
+  if (enabled) {
+    setSelected(dimBtn)
+    for (const btn of allBtns) {
+      if (btn !== dimBtn) setUnselected(btn)
+    }
+  }
+  else {
+    setUnselected(dimBtn)
+    if (lightsOutBtn) setSelected(lightsOutBtn)
+  }
+}
+
+function activateLightsOutFromSettings() {
+  const dimBtn = document.getElementById(X_DIM_MODE_BUTTON_ID)
+  if (!(dimBtn instanceof HTMLElement)) return
+  const radiogroup = dimBtn.closest<HTMLElement>('[role="radiogroup"]')
+  if (!radiogroup) return
+
+  const allBtns = getBackgroundButtons(radiogroup)
+  const lightsOutBtn = allBtns[allBtns.length - 1]
+  if (!lightsOutBtn) return
+
+  const loInput = lightsOutBtn.querySelector<HTMLInputElement>('input[type="radio"]')
+  if (loInput && !loInput.checked) {
+    switchingToDim = true
+    loInput.click()
+    loInput.dispatchEvent(new Event('input', { bubbles: true }))
+    loInput.dispatchEvent(new Event('change', { bubbles: true }))
+    window.setTimeout(() => {
+      switchingToDim = false
+    }, 300)
+  }
 }
 
 export function syncInjectedDimButton(prefs: XDimModePrefs) {
-  const button = document.getElementById(X_DIM_MODE_BUTTON_ID)
-  if (!(button instanceof HTMLElement)) return
-
-  setLabel(button, prefs.enabled)
-  if (prefs.enabled) setSelected(button)
-  else setUnselected(button)
+  syncSettingsButtons(prefs.enabled)
 }
 
 export function tryInjectDimModeIntoXSettings(prefs: XDimModePrefs) {
@@ -73,44 +126,51 @@ export function tryInjectDimModeIntoXSettings(prefs: XDimModePrefs) {
     return
   }
 
-  const group = getBackgroundPickerGroup()
-  if (!group) return
+  const radiogroup = getBackgroundPickerRadioGroup()
+  if (!radiogroup) return
 
-  const defaultButton = getButtonForValue(group, 'Default')
-  const lightsOutButton = getButtonForValue(group, 'LightsOut')
-  if (!defaultButton || !lightsOutButton) return
+  const buttons = getBackgroundButtons(radiogroup)
+  if (buttons.length < 2) return
 
-  const dimButton = lightsOutButton.cloneNode(true) as HTMLElement
-  dimButton.id = X_DIM_MODE_BUTTON_ID
-  dimButton.dataset.xDimMode = 'true'
+  const defaultBtn = buttons[0]
+  const lightsOutBtn = buttons[buttons.length - 1]
 
-  // Avoid interfering with X's own radio group handling.
-  const dimInput = dimButton.querySelector<HTMLInputElement>('input')
-  if (dimInput) {
-    dimInput.name = 'x-dim-mode'
-    dimInput.value = 'Dim'
-    dimInput.checked = false
+  // Clone the Lights Out button as our base.
+  const dimBtn = lightsOutBtn.cloneNode(true) as HTMLElement
+  dimBtn.id = X_DIM_MODE_BUTTON_ID
+
+  // Dim-specific visuals
+  dimBtn.style.backgroundColor = X_DIM_BG
+
+  // Change label to "Dim"
+  const label = dimBtn.querySelector('span')
+  if (label) label.textContent = DIM_LABEL
+
+  // Update aria label (keeps it accessible even if value is still LightsOut)
+  const input = dimBtn.querySelector<HTMLInputElement>('input[type="radio"]')
+  if (input) {
+    input.setAttribute('aria-label', DIM_LABEL)
+    input.checked = false
   }
 
-  setLabel(dimButton, prefs.enabled)
-  if (prefs.enabled) setSelected(dimButton)
-  else setUnselected(dimButton)
+  // Insert between Default and Lights Out
+  radiogroup.insertBefore(dimBtn, lightsOutBtn)
 
-  dimButton.addEventListener('click', () => {
+  // Initial visual state
+  syncInjectedDimButton(prefs)
+
+  // Click handlers
+  dimBtn.addEventListener('click', () => {
     void setXDimModePrefs({ enabled: true })
-    syncInjectedDimButton({ ...prefs, enabled: true })
-    activateLightsOut(group)
+    syncSettingsButtons(true)
+    activateLightsOutFromSettings()
   })
 
-  defaultButton.addEventListener('click', () => {
-    void setXDimModePrefs({ enabled: false })
-    syncInjectedDimButton({ ...prefs, enabled: false })
-  })
-
-  lightsOutButton.addEventListener('click', () => {
-    void setXDimModePrefs({ enabled: false })
-    syncInjectedDimButton({ ...prefs, enabled: false })
-  })
-
-  defaultButton.after(dimButton)
+  for (const nativeBtn of [defaultBtn, lightsOutBtn]) {
+    nativeBtn.addEventListener('click', () => {
+      if (switchingToDim) return
+      void setXDimModePrefs({ enabled: false })
+      setUnselected(dimBtn)
+    })
+  }
 }
