@@ -7,18 +7,21 @@ export default defineManifest({
   description: 'Restores the classic Dim theme on X (Twitter).',
   version: pkg.version,
   icons: {
-    48: 'public/logo.png',
+    16: 'public/icons/icon16.png',
+    48: 'public/icons/icon48.png',
+    128: 'public/icons/icon128.png',
   },
   action: {
     default_icon: {
-      48: 'public/logo.png',
+      16: 'public/icons/icon16.png',
+      48: 'public/icons/icon48.png',
     },
     default_popup: 'src/popup/index.html',
   },
   permissions: ['storage'],
   content_scripts: [{
     js: ['src/content/main.ts'],
-    matches: ['https://x.com/*', 'https://twitter.com/*'],
+    matches: ['https://x.com/*', 'https://twitter.com/*', 'https://pro.x.com/*'],
     run_at: 'document_start',
   }],
 })

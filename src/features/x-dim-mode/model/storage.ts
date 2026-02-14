@@ -1,6 +1,6 @@
 import { DEFAULT_X_DIM_MODE_PREFS, normalizeXDimModePrefs, type XDimModePrefs } from './prefs'
 
-const STORAGE_AREA: chrome.storage.StorageArea = chrome.storage.sync
+const STORAGE_AREA: chrome.storage.StorageArea = chrome.storage.local
 const PREFS_KEY = 'x_dim_mode_prefs_v1' as const
 
 type StorageShape = Record<typeof PREFS_KEY, XDimModePrefs | undefined>
@@ -46,7 +46,7 @@ export async function setXDimModePrefs(next: Partial<XDimModePrefs>): Promise<XD
 
 export function onXDimModePrefsChanged(listener: (prefs: XDimModePrefs) => void): () => void {
   const handler: Parameters<typeof chrome.storage.onChanged.addListener>[0] = (changes, areaName) => {
-    if (areaName !== 'sync') return
+    if (areaName !== 'local') return
     const change = changes[PREFS_KEY]
     if (!change) return
     listener({ ...DEFAULT_X_DIM_MODE_PREFS, ...normalizeXDimModePrefs(change.newValue) })

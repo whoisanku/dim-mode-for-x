@@ -7,7 +7,8 @@ Restores the classic "Dim" theme on X (Twitter) by replacing the pure-black ("Li
 - Chrome Extension (Manifest V3)
 - Popup UI (React + TypeScript + Tailwind v4)
 - Content script that applies the dim theme on `x.com` and `twitter.com`
-- Persisted toggle via `chrome.storage.sync`
+- Injects a "Dim" option into X Settings (Display background picker)
+- Persisted toggle via `chrome.storage.local`
 
 ## Quick Start
 
@@ -40,6 +41,7 @@ npm run build
 - `src/features/` - Feature modules (recommended place for app logic/UI)
 - `src/platform/` - Chrome API adapters
 - `src/styles/` - Shared stylesheets (Tailwind entrypoint lives here)
+- `public/icons/` - Extension icons
 - `manifest.config.ts` - Chrome extension manifest configuration
 
 ## Documentation

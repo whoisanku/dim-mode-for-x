@@ -1,42 +1,79 @@
 import type { XDimModeMessage, XDimModeMessageResponse } from '@/features/x-dim-mode/model/messages'
+import { DEFAULT_X_DIM_MODE_PREFS, type XDimModePrefs } from '@/features/x-dim-mode/model/prefs'
 import { getXDimModePrefs, onXDimModePrefsChanged, setXDimModePrefs } from '@/features/x-dim-mode/model/storage'
-import { getXDimModeCss } from '@/features/x-dim-mode/model/themeCss'
+import { createXDimModeScanner } from '@/features/x-dim-mode/content/scanner'
+import { tryInjectDimModeIntoXSettings, syncInjectedDimButton } from '@/features/x-dim-mode/content/settingsInjector'
+import { ensureXDimModeStyle, setXDimModeRootActive } from '@/features/x-dim-mode/content/styleManager'
 
-const STYLE_ID = 'x-dim-mode-style'
-
-function ensureStyleElement(): HTMLStyleElement {
-  const existing = document.getElementById(STYLE_ID)
-  if (existing && existing instanceof HTMLStyleElement) return existing
-
-  const style = document.createElement('style')
-  style.id = STYLE_ID
-  style.textContent = getXDimModeCss()
-  ;(document.head ?? document.documentElement).appendChild(style)
-  return style
+function isLightsOutThemeActive(): boolean {
+  return document.body?.classList.contains('LightsOut') ?? false
 }
 
-function removeStyleElement() {
-  document.getElementById(STYLE_ID)?.remove()
-}
+const scanner = createXDimModeScanner()
+let prefs: XDimModePrefs = DEFAULT_X_DIM_MODE_PREFS
 
-function applyEnabled(enabled: boolean) {
-  if (enabled) {
-    ensureStyleElement()
-    document.documentElement.dataset.xDimMode = 'on'
-    return
+function syncRuntime() {
+  ensureXDimModeStyle()
+  setXDimModeRootActive(prefs.enabled)
+
+  // Only scan/patch when X is in "Lights out" mode, otherwise we do nothing.
+  if (!prefs.enabled || !isLightsOutThemeActive()) {
+    scanner.clearAllMarks()
+  }
+  else {
+    scanner.scheduleFullScan()
   }
 
-  removeStyleElement()
-  delete document.documentElement.dataset.xDimMode
+  tryInjectDimModeIntoXSettings(prefs)
+  syncInjectedDimButton(prefs)
 }
 
-async function syncFromStorage() {
-  const prefs = await getXDimModePrefs()
-  applyEnabled(prefs.enabled)
+// Keep the feature mounted early to avoid flashes when switching themes.
+syncRuntime()
+
+void (async () => {
+  prefs = await getXDimModePrefs()
+  syncRuntime()
+})()
+
+onXDimModePrefsChanged((next) => {
+  prefs = next
+  syncRuntime()
+})
+
+const bodyObserver = new MutationObserver(() => {
+  // Theme changes are reflected via class mutations on <body>.
+  syncRuntime()
+})
+
+const rootObserver = new MutationObserver((mutations) => {
+  if (!prefs.enabled || !isLightsOutThemeActive()) return
+
+  for (const m of mutations) {
+    for (const node of m.addedNodes) {
+      if (node instanceof Element) scanner.scanElement(node)
+    }
+  }
+
+  scanner.scheduleFullScan()
+})
+
+rootObserver.observe(document.documentElement, { childList: true, subtree: true })
+
+function startBodyObserver() {
+  if (!document.body) return
+  bodyObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] })
 }
 
-void syncFromStorage()
-onXDimModePrefsChanged((prefs) => applyEnabled(prefs.enabled))
+startBodyObserver()
+
+// If body isn't available yet, we start observing it once it appears.
+const waitForBody = new MutationObserver(() => {
+  if (!document.body) return
+  startBodyObserver()
+  waitForBody.disconnect()
+})
+waitForBody.observe(document.documentElement, { childList: true, subtree: true })
 
 chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
   const msg = message as Partial<XDimModeMessage> | null | undefined
@@ -51,16 +88,17 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
   void (async () => {
     try {
       if (msg.type === 'X_DIM_MODE_GET_PREFS') {
-        const prefs = await getXDimModePrefs()
-        await respond({ ok: true, prefs })
+        const current = await getXDimModePrefs()
+        await respond({ ok: true, prefs: current })
         return
       }
 
       if (msg.type === 'X_DIM_MODE_SET_ENABLED') {
         const enabled = msg.enabled === true
-        const prefs = await setXDimModePrefs({ enabled })
-        applyEnabled(prefs.enabled)
-        await respond({ ok: true, prefs })
+        const updated = await setXDimModePrefs({ enabled })
+        prefs = updated
+        syncRuntime()
+        await respond({ ok: true, prefs: updated })
       }
     }
     catch (err) {
@@ -70,3 +108,4 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
 
   return true
 })
+
