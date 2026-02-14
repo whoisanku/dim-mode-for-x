@@ -1,12 +1,14 @@
 import { getXDimModeCss } from '../model/themeCss'
 import { X_DIM_MODE_ROOT_CLASS, X_DIM_MODE_STYLE_ID } from './constants'
 
+const BASE_CSS = getXDimModeCss(X_DIM_MODE_ROOT_CLASS)
+
 function getRoot(): HTMLElement {
   return document.documentElement
 }
 
 export function ensureXDimModeStyle() {
-  const css = getXDimModeCss(X_DIM_MODE_ROOT_CLASS)
+  const css = BASE_CSS
   const existing = document.getElementById(X_DIM_MODE_STYLE_ID)
   if (existing && existing instanceof HTMLStyleElement) {
     if (existing.textContent !== css) existing.textContent = css

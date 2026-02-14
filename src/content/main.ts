@@ -11,6 +11,13 @@ function isLightsOutThemeActive(): boolean {
 
 const scanner = createXDimModeScanner()
 let prefs: XDimModePrefs = DEFAULT_X_DIM_MODE_PREFS
+let dimApplied = false
+let rescanTimers: number[] = []
+
+function clearRescanTimers() {
+  for (const t of rescanTimers) window.clearTimeout(t)
+  rescanTimers = []
+}
 
 function syncRuntime() {
   ensureXDimModeStyle()
@@ -19,10 +26,17 @@ function syncRuntime() {
 
   // Only scan/patch when X is in "Lights out" mode, otherwise we do nothing.
   if (!shouldApplyDim) {
+    dimApplied = false
+    clearRescanTimers()
     scanner.clearAllMarks()
   }
-  else {
-    scanner.scheduleFullScan()
+  else if (!dimApplied) {
+    dimApplied = true
+    scanner.fullRescan()
+    clearRescanTimers()
+    for (const ms of [500, 1500, 3000, 5000]) {
+      rescanTimers.push(window.setTimeout(() => scanner.fullRescan(), ms))
+    }
   }
 
   tryInjectDimModeIntoXSettings(prefs)
@@ -53,15 +67,10 @@ const rootObserver = new MutationObserver((mutations) => {
   tryInjectDimModeIntoXSettings(prefs)
   syncInjectedDimButton(prefs)
 
-  if (!prefs.enabled || !isLightsOutThemeActive()) return
-
+  if (!dimApplied) return
   for (const m of mutations) {
-    for (const node of m.addedNodes) {
-      if (node instanceof Element) scanner.scanElement(node)
-    }
+    if (m.addedNodes.length) scanner.queueScan(m.addedNodes)
   }
-
-  scanner.scheduleFullScan()
 })
 
 rootObserver.observe(document.documentElement, { childList: true, subtree: true })

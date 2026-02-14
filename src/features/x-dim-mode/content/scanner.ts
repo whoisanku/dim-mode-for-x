@@ -4,8 +4,9 @@ import {
 } from './constants'
 import { X_LIGHTS_OUT_ELEVATED_BG } from '../model/colors'
 
-const COLOR_BLACK = new Set(['rgb(0,0,0)', 'rgb(0,0,0,1)', 'rgba(0,0,0,1)', '#000', '#000000'])
-const COLOR_BACKDROP = new Set(['rgba(0,0,0,0.65)', 'rgb(0,0,0,0.65)', 'rgba(0 0 0 / 0.65)'])
+const TAGS_TO_SCAN = 'div,main,aside,header,nav,section,article,footer,button'
+
+const COLOR_BLACK = new Set(['rgb(0,0,0)', 'rgba(0,0,0,1)'])
 const COLOR_ELEVATED = new Set([normalizeColor(X_LIGHTS_OUT_ELEVATED_BG)])
 
 function normalizeColor(value: string): string {
@@ -23,13 +24,16 @@ function unmarkDimmed(el: Element) {
 
 export function createXDimModeScanner() {
   const touched = new Set<Element>()
-  let scanTimeout: number | null = null
+  let scanFrame = 0
+  const pending = new Set<Element>()
 
   function scanElement(el: Element) {
-    // Detect inline styles that force "Lights out" black, and tag them for CSS to rewrite.
+    if (el.classList.contains(X_DIM_MODE_DIMMED_CLASS) || el.classList.contains(X_DIM_MODE_DIMMED_ELEVATED_CLASS)) return
+
+    // Inline black backgrounds are the common case.
     const inlineBg = el instanceof HTMLElement ? normalizeColor(el.style.backgroundColor) : ''
     if (inlineBg) {
-      if (COLOR_BLACK.has(inlineBg) || COLOR_BACKDROP.has(inlineBg)) {
+      if (COLOR_BLACK.has(inlineBg)) {
         markDimmed(el, false)
         touched.add(el)
         return
@@ -42,10 +46,17 @@ export function createXDimModeScanner() {
       }
     }
 
-    // Some X surfaces (e.g. Creator Studio) use computed styles rather than inline styles.
-    if (el instanceof HTMLElement && el.hasAttribute('jf-element')) {
-      const computed = normalizeColor(getComputedStyle(el).backgroundColor)
-      if (COLOR_BLACK.has(computed) || COLOR_BACKDROP.has(computed)) {
+    // Some X surfaces (e.g. Creator Studio) use computed styles.
+    if (el instanceof HTMLElement && el.classList.contains('jf-element')) {
+      let computed = ''
+      try {
+        computed = normalizeColor(getComputedStyle(el).backgroundColor)
+      }
+      catch {
+        return
+      }
+
+      if (COLOR_BLACK.has(computed)) {
         markDimmed(el, false)
         touched.add(el)
         return
@@ -58,30 +69,44 @@ export function createXDimModeScanner() {
     }
   }
 
-  function scheduleFullScan() {
-    if (scanTimeout !== null) return
-    scanTimeout = window.setTimeout(() => {
-      document.querySelectorAll('*').forEach(scanElement)
-      scanTimeout = null
-    }, 500)
+  function scanSubtree(root: Element) {
+    scanElement(root)
+    for (const el of root.querySelectorAll(TAGS_TO_SCAN)) scanElement(el)
   }
 
-  function cancelScheduledScan() {
-    if (scanTimeout === null) return
-    window.clearTimeout(scanTimeout)
-    scanTimeout = null
+  function flushScan() {
+    scanFrame = 0
+    const batch = Array.from(pending)
+    pending.clear()
+    for (const node of batch) scanSubtree(node)
+  }
+
+  function queueScan(nodes: Iterable<Node>) {
+    for (const n of nodes) {
+      if (n && n.nodeType === Node.ELEMENT_NODE) pending.add(n as Element)
+    }
+
+    if (pending.size && !scanFrame) {
+      scanFrame = requestAnimationFrame(flushScan)
+    }
+  }
+
+  function fullRescan() {
+    if (document.body) queueScan([document.body])
   }
 
   function clearAllMarks() {
-    cancelScheduledScan()
+    if (scanFrame) cancelAnimationFrame(scanFrame)
+    scanFrame = 0
+    pending.clear()
     touched.forEach(unmarkDimmed)
     touched.clear()
   }
 
   return {
-    scanElement,
-    scheduleFullScan,
-    cancelScheduledScan,
+    queueScan,
+    fullRescan,
     clearAllMarks,
   }
 }
+
